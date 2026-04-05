@@ -1,0 +1,28 @@
+# Environment variables (contains sensitive data)
+.env
+.env.local
+.env.*.local
+
+# Database files (auto-generated at runtime)
+*.db
+*.db-shm
+*.db-wal
+
+# Node modules
+node_modules/
+package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.suo

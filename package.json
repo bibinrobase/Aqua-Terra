@@ -1,0 +1,27 @@
+{
+  "name": "aqua-terra-smart-plant",
+  "version": "1.0.0",
+  "description": "Smart Water & Plant Monitoring System — Bio-Digital Greenhouse Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "arduino",
+    "iot",
+    "smart-plant",
+    "dashboard",
+    "3d",
+    "monitoring"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "better-sqlite3": "^9.4.3",
+    "serialport": "^12.0.0",
+    "dotenv": "^16.3.1"
+  }
+}
