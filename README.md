@@ -132,6 +132,10 @@ Arduino Uno
 1. Select **Board: Arduino Uno** and the correct **Port**
 1. Click **Upload**
 
+**VS Code Setup (Optional):**
+
+If using VS Code with the Arduino extension, the `.vscode/c_cpp_properties.json` file is included to enable IntelliSense. The configuration is generic and works with or without Arduino IDE installed. For full IDE integration with Arduino libraries, install the [Arduino extension](https://marketplace.visualstudio.com/items?itemName=vsciot-vscode.vscode-arduino).
+
 ### OLED Display
 
 The Arduino features a real-time **OLED display** with animated 8x8 pixel icons:
