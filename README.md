@@ -31,7 +31,7 @@ everything to a SQLite database.
 ## 📁 Project Structure
 
 ```text
-SmartPlant/
+Aqua-Terra/
 ├── index.html           # Complete frontend (HTML + CSS + JS, single file)
 ├── server.js            # Node.js Express backend with SerialPort + SQLite
 ├── database.js          # Database initialization and query helpers
@@ -54,7 +54,7 @@ SmartPlant/
 ### Step 1: Install Dependencies
 
 ```bash
-cd SmartPlant
+cd Aqua-Terra
 npm install
 ```
 
@@ -89,7 +89,7 @@ The server will start at [http://localhost:3000](http://localhost:3000)
 
 ### Step 4: Open the Dashboard
 
-Navigate to **http://localhost:3000** in Chrome or Edge.
+Navigate to <http://localhost:3000> in Chrome or Edge.
 
 - Click **"Connect Arduino"** to use the Web Serial API
 - If no Arduino is detected, **Demo Mode** starts automatically after 3 seconds
@@ -101,7 +101,7 @@ Navigate to **http://localhost:3000** in Chrome or Edge.
 ### Required Hardware
 
 | Component | Pin Connection |
-|---|---|
+| --- | --- |
 | DHT11 (Temp + Humidity) | Data → D3 |
 | Soil Moisture Sensor | Signal → A0 |
 | Water Level Sensor | Signal → A1 |
@@ -137,7 +137,7 @@ Arduino Uno
 The Arduino features a real-time **OLED display** with animated 8x8 pixel icons:
 
 | Icon | Sensor | Animation |
-|---|---|---|
+| --- | --- | --- |
 | 🔥 **Fire** | Temperature | Flickering flame indicates heat |
 | 💧 **Water Drop** | Water Level | Falling droplet shows water flow |
 | 🍃 **Leaf** | Soil Moisture | Swaying leaf indicates soil hydration |
@@ -146,7 +146,8 @@ The Arduino features a real-time **OLED display** with animated 8x8 pixel icons:
 Each icon animates independently with smooth non-blocking frame updates at 50Hz, ensuring the sensor loop is never blocked.
 
 **Display Layout:**
-```
+
+```text
      AQUA TERRA
   🔥 Temp 24.5°C
   💧 Hum  65.2%
@@ -174,7 +175,7 @@ The Arduino outputs clean JSON data every ~2 seconds:
 ## 📡 API Endpoints
 
 | Method | Endpoint | Description |
-|---|---|---|
+| --- | --- | --- |
 | `GET` | `/api/latest` | Most recent sensor reading |
 | `GET` | `/api/history?hours=24` | Historical readings |
 | `GET` | `/api/history?limit=100` | Last N readings |
@@ -196,7 +197,7 @@ curl -X POST http://localhost:3000/api/save \
 ## 🎨 Design System
 
 | Element | Value |
-|---|---|
+| --- | --- |
 | Background | `#050a05` (deep black-green) |
 | Primary | `#00ff88` (neon emerald) |
 | Accent | `#00d4ff` (electric cyan) |
