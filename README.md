@@ -181,6 +181,7 @@ The system includes a **safety-first relay circuit** that controls a water pump 
 #### Relay Control Logic
 
 The motor **only runs** when BOTH conditions are met:
+
 1. **Soil is dry** — Soil moisture is below 30%
 2. **Water is available** — Water level is at least 20%
 
@@ -208,7 +209,7 @@ Relay GND ──→ Power Supply GND
 
 #### Typical Setup
 
-```
+```text
 AC/DC Power Supply (12V or 24V recommended)
     │
     ├─→ Relay Module (COM)
@@ -221,6 +222,7 @@ AC/DC Power Supply (12V or 24V recommended)
 ```
 
 **Arduino Pin D4 Logic:**
+
 - **D4 = LOW** (0V) → Relay energized → Motor ON (pump water)
 - **D4 = HIGH** (5V) → Relay de-energized → Motor OFF (stop pump)
 
@@ -242,17 +244,20 @@ AC/DC Power Supply (12V or 24V recommended)
 **Hardware Fix (MUST DO):**
 
 1. **Add protection diode across relay coil:**
-   ```
+
+   ```text
    Relay Coil (+) ←─→ 1N4007 Diode ←─→ Relay Coil (-)
    Cathode stripe → HIGH side
    ```
 
 2. **Add decoupling capacitors to power supply:**
+
    - 100µF capacitor across main power supply
    - 10µF capacitor across Arduino 5V and GND
 
 3. **Optional but recommended: Use transistor buffer:**
-   ```
+
+   ```text
    Arduino D4 ──→ [10kΩ resistor] ──→ Base of 2N2222 NPN Transistor
                                           │
                                           Emitter ──→ GND
@@ -265,6 +270,7 @@ AC/DC Power Supply (12V or 24V recommended)
 **Firmware Fix (Already Implemented):**
 
 The code now includes:
+
 - Software debouncing (500ms delay between relay state changes)
 - Separate desired state tracking (`relayDesiredState`)
 - Safe relay switching function (`updateRelayState()`)
