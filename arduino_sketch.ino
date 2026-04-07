@@ -18,6 +18,8 @@ int soilPct = 0;
 int waterPct = 0;
 
 int relayState = HIGH;
+int relayDesiredState = HIGH;
+unsigned long lastRelayChangeMs = 0;
 
 uint8_t tempFrame = 0;
 uint8_t humFrame = 0;
@@ -37,6 +39,7 @@ const unsigned long TEMP_ANIM_INTERVAL_MS = 95;
 const unsigned long HUM_ANIM_INTERVAL_MS = 140;
 const unsigned long SOIL_ANIM_INTERVAL_MS = 170;
 const unsigned long WATER_ANIM_INTERVAL_MS = 120;
+const unsigned long RELAY_DEBOUNCE_MS = 500;  // 500ms debounce to protect relay
 
 // ---------------- ICONS ----------------
 
@@ -91,9 +94,21 @@ void readAnalogSensors() {
   soilPct = constrain(soilPct, 0, 100);
   waterPct = constrain(waterPct, 0, 100);
 
+  // Determine desired relay state based on sensors
   // Motor runs only if soil is dry AND water level is adequate
-  relayState = (soilPct < 30 && waterPct >= 20) ? LOW : HIGH;
-  digitalWrite(RELAY_PIN, relayState);
+  relayDesiredState = (soilPct < 30 && waterPct >= 20) ? LOW : HIGH;
+}
+
+// Safe relay switching with debouncing to prevent voltage spikes
+void updateRelayState() {
+  unsigned long now = millis();
+
+  // Only change relay state if debounce period has passed
+  if (relayDesiredState != relayState && (now - lastRelayChangeMs >= RELAY_DEBOUNCE_MS)) {
+    relayState = relayDesiredState;
+    digitalWrite(RELAY_PIN, relayState);
+    lastRelayChangeMs = now;
+  }
 }
 
 void sendSerialJson() {
@@ -197,6 +212,7 @@ void loop() {
     lastSensorReadMs = now;
     readDHT();
     readAnalogSensors();
+    updateRelayState();  // Safely update relay with debouncing
   }
 
   if (now - lastSerialSendMs >= SERIAL_INTERVAL_MS) {

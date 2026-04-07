@@ -230,6 +230,50 @@ AC/DC Power Supply (12V or 24V recommended)
 - ✅ **Soil Moisture Threshold** — Only triggers pump at 30% soil moisture
 - ✅ **Relay Diode Protection** — Use a 1N4007 diode across relay coil to prevent back-EMF damage
 - ✅ **Separate Power Supply** — Never power high-current motor from Arduino 5V rail
+- ✅ **Relay Debouncing** — 500ms software debounce prevents voltage spikes
+- ✅ **Transistor Buffer** — Optional: Use NPN transistor (2N2222) to isolate relay from Arduino
+
+#### ⚡ CRITICAL FIX: Arduino Crash on First Relay Activation
+
+**Problem:** System freezes when relay turns on for the first time.
+
+**Root Cause:** Inrush current from relay coil causes voltage spike that crashes Arduino.
+
+**Hardware Fix (MUST DO):**
+
+1. **Add protection diode across relay coil:**
+   ```
+   Relay Coil (+) ←─→ 1N4007 Diode ←─→ Relay Coil (-)
+   Cathode stripe → HIGH side
+   ```
+
+2. **Add decoupling capacitors to power supply:**
+   - 100µF capacitor across main power supply
+   - 10µF capacitor across Arduino 5V and GND
+
+3. **Optional but recommended: Use transistor buffer:**
+   ```
+   Arduino D4 ──→ [10kΩ resistor] ──→ Base of 2N2222 NPN Transistor
+                                          │
+                                          Emitter ──→ GND
+                                          │
+                                          Collector ──→ Relay IN
+   ```
+
+4. **Use separate power supply for motor/relay** — 12V or 24V dedicated supply, NOT Arduino 5V rail
+
+**Firmware Fix (Already Implemented):**
+
+The code now includes:
+- Software debouncing (500ms delay between relay state changes)
+- Separate desired state tracking (`relayDesiredState`)
+- Safe relay switching function (`updateRelayState()`)
+
+**Test Procedure:**
+
+1. Add all hardware fixes above
+2. Upload updated sketch
+3. Test relay activation — should be smooth with NO crashes or freezes
 
 #### Relay Specifications
 
@@ -240,6 +284,7 @@ AC/DC Power Supply (12V or 24V recommended)
 | Contact Rating | 10A @ 250V AC / 30V DC typical |
 | Max Motor Load | ~3-5A (depends on relay specs) |
 | Response Time | <30ms |
+| Debounce Time | 500ms (software protection) |
 
 ---
 
