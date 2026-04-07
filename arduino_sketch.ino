@@ -91,7 +91,8 @@ void readAnalogSensors() {
   soilPct = constrain(soilPct, 0, 100);
   waterPct = constrain(waterPct, 0, 100);
 
-  relayState = (soilPct < 30) ? LOW : HIGH;
+  // Motor runs only if soil is dry AND water level is adequate
+  relayState = (soilPct < 30 && waterPct >= 20) ? LOW : HIGH;
   digitalWrite(RELAY_PIN, relayState);
 }
 

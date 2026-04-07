@@ -174,6 +174,73 @@ The Arduino outputs clean JSON data every ~2 seconds:
 - All animations use non-blocking `millis()` timing—no delays block the sensor loop
 - Each animation frame runs at its own configurable interval (95ms fire, 140ms humidity, etc.)
 
+### 🔌 Relay / Motor Connection
+
+The system includes a **safety-first relay circuit** that controls a water pump or motor for automated watering.
+
+#### Relay Control Logic
+
+The motor **only runs** when BOTH conditions are met:
+1. **Soil is dry** — Soil moisture is below 30%
+2. **Water is available** — Water level is at least 20%
+
+This prevents the motor from running when water is depleted, protecting the pump from damage.
+
+#### Wiring the Relay Module
+
+**5V Relay Module to Arduino:**
+
+```text
+Relay Module     →  Arduino Uno
+GND             →  GND
+VCC             →  5V
+IN (Signal)     →  D4 (RELAY_PIN)
+```
+
+**Motor/Pump to Relay:**
+
+```text
+Power Supply ──→ Relay Module COM (Common)
+Relay NO (normally open) ──→ Motor (+)
+Motor (-) ──→ Power Supply GND
+Relay GND ──→ Power Supply GND
+```
+
+#### Typical Setup
+
+```
+AC/DC Power Supply (12V or 24V recommended)
+    │
+    ├─→ Relay Module (COM)
+    │
+    └─→ Motor/Pump 
+         │
+         ├─→ Relay NO (from relay output)
+         │
+         └─→ back to Power Supply GND
+```
+
+**Arduino Pin D4 Logic:**
+- **D4 = LOW** (0V) → Relay energized → Motor ON (pump water)
+- **D4 = HIGH** (5V) → Relay de-energized → Motor OFF (stop pump)
+
+#### Safety Features
+
+- ✅ **Water Level Check** — Motor won't run if water tank is empty
+- ✅ **Soil Moisture Threshold** — Only triggers pump at 30% soil moisture
+- ✅ **Relay Diode Protection** — Use a 1N4007 diode across relay coil to prevent back-EMF damage
+- ✅ **Separate Power Supply** — Never power high-current motor from Arduino 5V rail
+
+#### Relay Specifications
+
+| Specification | Typical Values |
+| --- | --- |
+| Operating Voltage | 5V DC |
+| Max Current (Control Pin) | 2-3mA |
+| Contact Rating | 10A @ 250V AC / 30V DC typical |
+| Max Motor Load | ~3-5A (depends on relay specs) |
+| Response Time | <30ms |
+
 ---
 
 ## 📡 API Endpoints
