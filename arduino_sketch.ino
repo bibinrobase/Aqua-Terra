@@ -1,246 +1,123 @@
 #include <DHT.h>
-#include <U8g2lib.h>
 
-// ---------------- PINS ----------------
-#define DHT_PIN 3
-#define DHT_TYPE DHT11
+// ----------- PINS -----------
 #define RELAY_PIN 4
-#define SOIL_PIN A0
 #define WATER_PIN A1
+#define SOIL_PIN  A0
+#define DHT_PIN   3
+#define RED_LED_PIN  5      // Red LED for dry soil
+#define GREEN_LED_PIN 6    // Green LED for good soil
+#define BLUE_LED_PIN 7     // Blue LED for overwatered
+
+#define DHT_TYPE DHT11
 
 DHT dht(DHT_PIN, DHT_TYPE);
-U8G2_SSD1306_128X64_NONAME_1_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
 
-// ---------------- VARIABLES ----------------
-float humidity = 50.0;
-float temperature = 25.0;
-int soilPct = 0;
-int waterPct = 0;
+// ----------- THRESHOLDS -----------
+int WATER_EMPTY = 300;    // Raw value when tank empty
+int WATER_FULL = 600;     // Raw value when tank full
+int SOIL_EMPTY = 1023;    // Raw value when soil empty (dry)
+int SOIL_FULL = 300;        // Raw value when soil saturated (wet)
 
-int relayState = HIGH;
-int relayDesiredState = HIGH;
-unsigned long lastRelayChangeMs = 0;
+// ----------- VARIABLES -----------
+float temperature = 0;
+float humidity = 0;
 
-uint8_t tempFrame = 0;
-uint8_t humFrame = 0;
-uint8_t soilFrame = 0;
-uint8_t waterFrame = 0;
-
-unsigned long lastSensorReadMs = 0;
-unsigned long lastSerialSendMs = 0;
-unsigned long lastTempAnimMs = 0;
-unsigned long lastHumAnimMs = 0;
-unsigned long lastSoilAnimMs = 0;
-unsigned long lastWaterAnimMs = 0;
-
-const unsigned long SENSOR_INTERVAL_MS = 2000;
-const unsigned long SERIAL_INTERVAL_MS = 2000;
-const unsigned long TEMP_ANIM_INTERVAL_MS = 95;
-const unsigned long HUM_ANIM_INTERVAL_MS = 140;
-const unsigned long SOIL_ANIM_INTERVAL_MS = 170;
-const unsigned long WATER_ANIM_INTERVAL_MS = 120;
-const unsigned long RELAY_DEBOUNCE_MS = 500;  // 500ms debounce to protect relay
-
-// ---------------- ICONS ----------------
-
-// Fire (temperature flicker)
-const uint8_t fireFrames[4][8] PROGMEM = {
-  { 0x00, 0x10, 0x38, 0x7c, 0x6c, 0x64, 0x38, 0x00 },
-  { 0x00, 0x10, 0x10, 0x38, 0x7c, 0x74, 0x6c, 0x38 },
-  { 0x00, 0x20, 0x30, 0x78, 0x7c, 0x6c, 0x38, 0x00 },
-  { 0x00, 0x10, 0x38, 0x7c, 0x5c, 0x6c, 0x38, 0x00 },
-};
-
-// Bubble pop (humidity)
-const uint8_t bubbleFrames[4][8] PROGMEM = {
-  { 0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00 },
-  { 0x00, 0x00, 0x18, 0x24, 0x24, 0x18, 0x00, 0x00 },
-  { 0x00, 0x18, 0x24, 0x42, 0x42, 0x24, 0x18, 0x00 },
-  { 0x42, 0x81, 0x00, 0x00, 0x00, 0x00, 0x81, 0x42 },
-};
-
-// Leaf sway (soil)
-const uint8_t leafFrames[4][8] PROGMEM = {
-  { 0x08, 0x1c, 0x3c, 0x3e, 0x1e, 0x0c, 0x04, 0x00 },
-  { 0x10, 0x18, 0x3c, 0x3e, 0x1e, 0x0c, 0x04, 0x00 },
-  { 0x20, 0x70, 0x7c, 0x3e, 0x0e, 0x0c, 0x04, 0x00 },
-  { 0x10, 0x18, 0x3c, 0x3e, 0x1e, 0x0c, 0x04, 0x00 },
-};
-
-// Water droplet fall (water)
-const uint8_t dropFrames[4][8] PROGMEM = {
-  { 0x08, 0x1c, 0x3e, 0x3e, 0x1c, 0x00, 0x00, 0x00 },
-  { 0x00, 0x08, 0x1c, 0x3e, 0x3e, 0x1c, 0x00, 0x00 },
-  { 0x00, 0x00, 0x08, 0x1c, 0x3e, 0x3e, 0x1c, 0x00 },
-  { 0x00, 0x00, 0x00, 0x08, 0x1c, 0x3e, 0x3e, 0x1c },
-};
-
-// ---------------- SAFE DHT ----------------
-void readDHT() {
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
-
-  if (!isnan(h)) humidity = h;
-  if (!isnan(t)) temperature = t;
-}
-
-void readAnalogSensors() {
-  int soilRaw = analogRead(SOIL_PIN);
-  int waterRaw = analogRead(WATER_PIN);
-
-  soilPct = map(soilRaw, 1023, 300, 0, 100);
-  waterPct = map(waterRaw, 0, 500, 0, 100);
-
-  soilPct = constrain(soilPct, 0, 100);
-  waterPct = constrain(waterPct, 0, 100);
-
-  // Determine desired relay state based on sensors
-  // Motor runs only if soil is dry AND water level is adequate
-  relayDesiredState = (soilPct < 30 && waterPct >= 20) ? LOW : HIGH;
-}
-
-// Safe relay switching with debouncing to prevent voltage spikes
-void updateRelayState() {
-  unsigned long now = millis();
-
-  // Only change relay state if debounce period has passed
-  if (relayDesiredState != relayState && (now - lastRelayChangeMs >= RELAY_DEBOUNCE_MS)) {
-    relayState = relayDesiredState;
-    digitalWrite(RELAY_PIN, relayState);
-    lastRelayChangeMs = now;
-  }
-}
-
-void sendSerialJson() {
-  Serial.print("{\"humidity\":");
-  Serial.print(humidity, 1);
-  Serial.print(",\"temperature\":");
-  Serial.print(temperature, 1);
-  Serial.print(",\"soil\":");
-  Serial.print(soilPct);
-  Serial.print(",\"waterLevel\":");
-  Serial.print(waterPct);
-  Serial.print(",\"relay\":");
-  Serial.print(relayState == LOW ? 1 : 0);
-  Serial.print(",\"motorRunning\":");
-  Serial.print(relayState == LOW ? 1 : 0);
-  Serial.println("}");
-}
-
-void drawIcon8x8(int x, int y, const uint8_t* icon) {
-  display.drawXBMP(x, y, 8, 8, icon);
-}
-
-// ---------------- DRAW UI ----------------
-void drawUI() {
-
-  display.firstPage();
-  do {
-    char tempStr[10];
-    char humStr[10];
-    char soilStr[10];
-    char waterStr[10];
-
-    dtostrf(temperature, 4, 1, tempStr);
-    dtostrf(humidity, 4, 1, humStr);
-
-    sprintf(soilStr, "%3d%%", soilPct);
-    sprintf(waterStr, "%3d%%", waterPct);
-
-    display.setFont(u8g2_font_6x12_tr);
-
-    // ---------- TITLE ----------
-    display.drawStr(28, 10, "AQUA TERRA");
-
-    int iconX = 6;
-    int labelX = 20;
-    int valueRightX = 120;
-
-    int y1 = 24;
-    int y2 = 36;
-    int y3 = 48;
-    int y4 = 60;
-
-    // ---------- TEMP ----------
-    drawIcon8x8(iconX, y1 - 8, fireFrames[tempFrame]);
-    display.drawStr(labelX, y1, "Temp");
-    display.drawStr(valueRightX - display.getStrWidth(tempStr) - 10, y1, tempStr);
-    display.drawStr(valueRightX - 8, y1, "C");
-
-    // ---------- HUM ----------
-    drawIcon8x8(iconX, y2 - 8, bubbleFrames[humFrame]);
-    display.drawStr(labelX, y2, "Hum ");
-    display.drawStr(valueRightX - display.getStrWidth(humStr) - 10, y2, humStr);
-    display.drawStr(valueRightX - 8, y2, "%");
-
-    // ---------- SOIL (SHIFTED LEFT ~3px) ----------
-    drawIcon8x8(iconX, y3 - 8, leafFrames[soilFrame]);
-    display.drawStr(labelX, y3, "Soil");
-    display.drawStr(valueRightX - display.getStrWidth(soilStr) - 3, y3, soilStr);
-
-    // ---------- WATER (SHIFTED LEFT ~3px) ----------
-    drawIcon8x8(iconX, y4 - 8, dropFrames[waterFrame]);
-    display.drawStr(labelX, y4, "Water");
-    display.drawStr(valueRightX - display.getStrWidth(waterStr) - 3, y4, waterStr);
-
-  } while (display.nextPage());
-}
-
-// ---------------- SETUP ----------------
 void setup() {
   Serial.begin(9600);
 
-  dht.begin();
-  display.begin();
-  display.setContrast(255);
-
   pinMode(RELAY_PIN, OUTPUT);
-  digitalWrite(RELAY_PIN, HIGH);
+  digitalWrite(RELAY_PIN, HIGH); // Motor OFF
 
-  readDHT();
-  readAnalogSensors();
-  sendSerialJson();
+  pinMode(RED_LED_PIN, OUTPUT);
+  pinMode(GREEN_LED_PIN, OUTPUT);
+  pinMode(BLUE_LED_PIN, OUTPUT);
+  digitalWrite(RED_LED_PIN, LOW);
+  digitalWrite(GREEN_LED_PIN, LOW);
+  digitalWrite(BLUE_LED_PIN, LOW);
 
-  delay(2000);
+  dht.begin();
+
+  Serial.println("Smart Irrigation System with LED Indicators (DHT11 Version)");
 }
 
-// ---------------- LOOP ----------------
 void loop() {
-  unsigned long now = millis();
 
-  if (now - lastSensorReadMs >= SENSOR_INTERVAL_MS) {
-    lastSensorReadMs = now;
-    readDHT();
-    readAnalogSensors();
-    updateRelayState();  // Safely update relay with debouncing
+  // ----------- READ SENSORS -----------
+  int soilRaw  = analogRead(SOIL_PIN);
+  int waterRaw = analogRead(WATER_PIN);
+
+  // ----------- CONVERT TO PERCENTAGES -----------
+  // Water: 150 = 0%, 550 = 100%
+  int waterPercent = map(waterRaw, WATER_EMPTY, WATER_FULL, 0, 100);
+  waterPercent = constrain(waterPercent, 0, 100);
+
+  // Soil: 1023 = 0% (dry), 0 = 100% (saturated)
+  int soilPercent = map(soilRaw, SOIL_EMPTY, SOIL_FULL, 0, 100);
+  soilPercent = constrain(soilPercent, 0, 100);
+
+  temperature = dht.readTemperature();
+  humidity    = dht.readHumidity();
+
+  // ----------- SOIL STATE DESCRIPTION -----------
+  const char* soilState;
+  if (soilRaw > 600) {
+    soilState = "DRY";
+  }
+  else if (soilRaw >= 550) {
+    soilState = "GOOD";
+  }
+  else {
+    soilState = "OVERWATERED";
   }
 
-  if (now - lastSerialSendMs >= SERIAL_INTERVAL_MS) {
-    lastSerialSendMs = now;
-    sendSerialJson();
+  // ----------- CONDITIONS -----------
+  bool waterAvailable = waterPercent > 10;   // More than 10% water available
+  bool soilDry = soilRaw > 600;              // Soil is dry
+
+  // ----------- LED INDICATORS -----------
+  // RED LED: Plant is dry (soil < 30%)
+  // GREEN LED: Plant is healthy (soil 30-70%)
+  // BLUE LED: Plant is overwatered (soil > 70%)
+  if (soilPercent < 30) {
+    digitalWrite(RED_LED_PIN, HIGH);    // Soil is DRY - Turn RED LED ON
+    digitalWrite(GREEN_LED_PIN, LOW);   // Turn GREEN LED OFF
+    digitalWrite(BLUE_LED_PIN, LOW);    // Turn BLUE LED OFF
+  } 
+  else if (soilPercent <= 70) {
+    digitalWrite(RED_LED_PIN, LOW);     // Turn RED LED OFF
+    digitalWrite(GREEN_LED_PIN, HIGH);  // Soil is GOOD - Turn GREEN LED ON
+    digitalWrite(BLUE_LED_PIN, LOW);    // Turn BLUE LED OFF
+  }
+  else {
+    digitalWrite(RED_LED_PIN, LOW);     // Turn RED LED OFF
+    digitalWrite(GREEN_LED_PIN, LOW);   // Turn GREEN LED OFF
+    digitalWrite(BLUE_LED_PIN, HIGH);   // OVERWATERED - Turn BLUE LED ON
   }
 
-  if (now - lastTempAnimMs >= TEMP_ANIM_INTERVAL_MS) {
-    lastTempAnimMs = now;
-    tempFrame = (tempFrame + 1) % 4;
+  // ----------- RELAY CONTROL -----------
+  if (waterAvailable && soilDry) {
+    digitalWrite(RELAY_PIN, LOW); // Motor ON
+  } else {
+    digitalWrite(RELAY_PIN, HIGH); // Motor OFF
   }
 
-  if (now - lastHumAnimMs >= HUM_ANIM_INTERVAL_MS) {
-    lastHumAnimMs = now;
-    humFrame = (humFrame + 1) % 4;
-  }
+  // ----------- SERIAL OUTPUT (JSON with percentages) -----------
+  Serial.print("{\"temperature\":");
+  Serial.print(temperature, 1);
+  Serial.print(",\"humidity\":");
+  Serial.print(humidity, 1);
+  Serial.print(",\"soil\":");
+  Serial.print(soilPercent);       // Send percentage, not raw
+  Serial.print(",\"waterLevel\":");
+  Serial.print(waterPercent);      // Send percentage, not raw
+  Serial.print(",\"soilState\":\"");
+  Serial.print(soilState);
+  Serial.print("\",\"relay\":");
+  Serial.print(digitalRead(RELAY_PIN) == LOW ? 1 : 0);
+  Serial.print(",\"motorRunning\":");
+  Serial.print(digitalRead(RELAY_PIN) == LOW ? 1 : 0);
+  Serial.println("}");
 
-  if (now - lastSoilAnimMs >= SOIL_ANIM_INTERVAL_MS) {
-    lastSoilAnimMs = now;
-    soilFrame = (soilFrame + 1) % 4;
-  }
-
-  if (now - lastWaterAnimMs >= WATER_ANIM_INTERVAL_MS) {
-    lastWaterAnimMs = now;
-    waterFrame = (waterFrame + 1) % 4;
-  }
-
-  drawUI();
-
-  delay(50);
+  delay(1000);
 }
